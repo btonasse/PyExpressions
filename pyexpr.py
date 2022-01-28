@@ -37,7 +37,7 @@ class Expression:
         self.left = left
         self.right = right
         self.operator = operator.replace('^', '**')
-        self._str_representation = ""
+        self._str_representation = str(left)+self.operator+str(right)
 
     def _no_funny_stuff(self, left, right, operator):
         """
@@ -125,21 +125,29 @@ class ExpressionBuilder:
     def _build_expression(self, expr: str) -> Expression:
         for operator in self.operators:
             terms = self._parse_terms(expr, operator)
-            print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
+            #print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
             if not terms:
                 continue
+            print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
             left, right = terms[0], terms[1]
-            if sum((Operator.has_value(char) for char in expr)) > 1:
+            if sum((Operator.has_value(char) for char in left)) > 1:
+                print(f"Left is a larger expr: {left}")
                 left = self._build_expression(left)
+                print(f"out of left recursion. left = {left} type {type(left)}")
+            if sum((Operator.has_value(char) for char in right)) > 1:
+                print(f"Right is a larger expr: {right}")
                 right = self._build_expression(right)
+                print(f'out of right recursion right = {right} type {type(right)}')
             if sum((Operator.has_value(char) for char in expr)) == 1: # Base case: only one operation left in expression
                 # Check if term is a letter (hashed parenthesis expression)
                 if left in ascii_letters:
                     print(f"Left {left} is actually {self._bracket_tree[left]}")
                     left = self._build_expression(self._bracket_tree[left])
+                    print(f'out of bracket left recursion. left = {left} type {type(left)}')
                 if right in ascii_letters:
                     print(f"Right {right} is actually {self._bracket_tree[right]}")
                     right = self._build_expression(self._bracket_tree[right])
+                    print(f'out of bracket right recursion right = {right} type {type(right)}')
                 return Expression(left, right, operator)
     
     def build(self) -> Expression:
@@ -243,6 +251,7 @@ def main():
     simple = Expression.parse(demoexpr)
     print(f"Demo simple expression: {simple} = {simple.calculate()}\n")
 
+    print(test3)
     complex = Expression.parse(test3)
     print(f"Demo complex expression: {complex} = {complex.calculate()}")
     print(f"Expected result: {eval(str(complex).replace('^', '**'))}")
