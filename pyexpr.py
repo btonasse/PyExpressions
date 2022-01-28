@@ -1,6 +1,6 @@
 import re
-from string import ascii_letters
 from enum import Enum
+from string import ascii_letters
 from typing import Any, Tuple
 
 
@@ -44,7 +44,8 @@ class Expression:
         Prevent malicious code execution
         """
         if any(type(x) not in [int, float, Expression] for x in [left, right]):
-            raise ValueError("Operands can only be ints, floats, or other Expressions")
+            raise ValueError(
+                "Operands can only be ints, floats, or other Expressions")
         if not Operator.has_value(operator):
             raise ValueError(
                 "Only basic arithmetic operators are valid: '+', '-', '*', '/', '^'"
@@ -80,13 +81,16 @@ class Expression:
         expression = builder.build()
         return expression
 
+
 class ExpressionBuilder:
     """
     Meta class that is not supposed to be called directly, but my the parse() method of the Expression class.
     """
     bracket_regex = r"\([^\(\)]+\)"
-    #operation_regex = r"(?=(\d+\.?\d*%\d+\.?\d*))"  # Replace % with the actual escaped operand
-    operators = [member.value for member in reversed(list(Operator))] # Operators is priority ascending order
+    # operation_regex = r"(?=(\d+\.?\d*%\d+\.?\d*))"  # Replace % with the actual escaped operand
+    # Operators in priority ascending order
+    operators = [member.value for member in reversed(list(Operator))]
+
     def __init__(self, expr: str):
         self._count = -1
         self._bracket_tree = {}
@@ -107,7 +111,8 @@ class ExpressionBuilder:
         so then can be referenced later when building
         the order or operations tree
         """
-        new_expr = re.sub(self.bracket_regex, self._replace_and_increment, expr)
+        new_expr = re.sub(self.bracket_regex,
+                          self._replace_and_increment, expr)
         # print(self._tree)
         # print(new_expr)
         if "(" in new_expr:
@@ -116,12 +121,12 @@ class ExpressionBuilder:
 
     def _parse_terms(self, expr: str, operator: str) -> Tuple[str]:
         splitexpr = expr.rsplit(operator)
-        if splitexpr[0] == expr: # No more operations found for given operator
+        if splitexpr[0] == expr:  # No more operations found for given operator
             return None
         right = splitexpr.pop()
         left = operator.join(splitexpr)
         return left, right
-    
+
     def _build_expression(self, expr: str) -> Expression:
         for operator in self.operators:
             terms = self._parse_terms(expr, operator)
@@ -133,27 +138,35 @@ class ExpressionBuilder:
             if sum((Operator.has_value(char) for char in left)) > 1:
                 print(f"Left is a larger expr: {left}")
                 left = self._build_expression(left)
-                print(f"out of left recursion. left = {left} type {type(left)}")
+                print(
+                    f"out of left recursion. left = {left} type {type(left)}")
             if sum((Operator.has_value(char) for char in right)) > 1:
                 print(f"Right is a larger expr: {right}")
                 right = self._build_expression(right)
-                print(f'out of right recursion right = {right} type {type(right)}')
-            if sum((Operator.has_value(char) for char in expr)) == 1: # Base case: only one operation left in expression
+                print(
+                    f'out of right recursion right = {right} type {type(right)}')
+            # Base case: only one operation left in expression
+            if sum((Operator.has_value(char) for char in expr)) == 1:
                 # Check if term is a letter (hashed parenthesis expression)
                 if left in ascii_letters:
-                    print(f"Left {left} is actually {self._bracket_tree[left]}")
+                    print(
+                        f"Left {left} is actually {self._bracket_tree[left]}")
                     left = self._build_expression(self._bracket_tree[left])
-                    print(f'out of bracket left recursion. left = {left} type {type(left)}')
+                    print(
+                        f'out of bracket left recursion. left = {left} type {type(left)}')
                 if right in ascii_letters:
-                    print(f"Right {right} is actually {self._bracket_tree[right]}")
+                    print(
+                        f"Right {right} is actually {self._bracket_tree[right]}")
                     right = self._build_expression(self._bracket_tree[right])
-                    print(f'out of bracket right recursion right = {right} type {type(right)}')
+                    print(
+                        f'out of bracket right recursion right = {right} type {type(right)}')
                 return Expression(left, right, operator)
-    
+
     def build(self) -> Expression:
         expr = self._build_expression(self._expr_hashed_brackets)
         expr._str_representation = self.expression_str
         return expr
+
 
 class ExpressionTree:
     """
@@ -162,7 +175,8 @@ class ExpressionTree:
     """
 
     bracket_regex = r"\([^\(\)]+\)"
-    operation_regex = r"(?:(?:\d+\.?\d*)|\w)%(?:(?:\d+\.?\d*)|\w)"  # Replace % with the actual escaped operand
+    # Replace % with the actual escaped operand
+    operation_regex = r"(?:(?:\d+\.?\d*)|\w)%(?:(?:\d+\.?\d*)|\w)"
 
     def __init__(self, expr: str):
         self.expression_str = expr
@@ -187,7 +201,8 @@ class ExpressionTree:
         so then can be referenced later when building
         the order or operations tree
         """
-        new_expr = re.sub(self.bracket_regex, self._replace_and_increment, expr)
+        new_expr = re.sub(self.bracket_regex,
+                          self._replace_and_increment, expr)
         # print(self._tree)
         # print(new_expr)
         if "(" in new_expr:
@@ -212,7 +227,8 @@ class ExpressionTree:
                 for element in Operator:
                     if sum((Operator.has_value(char) for char in self._tree[k])) > 1:
                         self._tree[k] = self._hash_operations(v, element)
-                self._tree[k] = self._tree[k].replace("(", "").replace(")", "") # Remove unnecessary brackets from expression
+                # Remove unnecessary brackets from expression
+                self._tree[k] = self._tree[k].replace("(", "").replace(")", "")
 
     def build_expression(self) -> Expression:
         root_expr = self._tree[self._root]
@@ -255,8 +271,6 @@ def main():
     complex = Expression.parse(test3)
     print(f"Demo complex expression: {complex} = {complex.calculate()}")
     print(f"Expected result: {eval(str(complex).replace('^', '**'))}")
-
-    
 
 
 if __name__ == "__main__":
