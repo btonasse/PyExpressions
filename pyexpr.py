@@ -33,7 +33,7 @@ class Operator(Enum):
 
 class Expression:
     def __init__(self, left, right, operator: str):
-        self._no_funny_stuff(left, right, operator)
+        #self._no_funny_stuff(left, right, operator)
         self.left = left
         self.right = right
         self.operator = operator.replace('^', '**')
@@ -65,14 +65,87 @@ class Expression:
     def __str__(self) -> str:
         return self._str_representation
 
+    """
     @classmethod
     def parse(cls, expr: str):
         treeobj = ExpressionTree(expr)
         expression = treeobj.build_expression()
         expression._str_representation = expr
         return expression
+    """
 
+    @classmethod
+    def parse(cls, expr: str):
+        builder = ExpressionBuilder(expr)
+        expression = builder.build()
+        return expression
 
+class ExpressionBuilder:
+    """
+    Meta class that is not supposed to be called directly, but my the parse() method of the Expression class.
+    """
+    bracket_regex = r"\([^\(\)]+\)"
+    #operation_regex = r"(?=(\d+\.?\d*%\d+\.?\d*))"  # Replace % with the actual escaped operand
+    operators = [member.value for member in reversed(list(Operator))] # Operators is priority ascending order
+    def __init__(self, expr: str):
+        self._count = -1
+        self._bracket_tree = {}
+        self.expression_str = expr
+        self._expr_hashed_brackets = self._hash_brackets(self.expression_str)
+        print(self._expr_hashed_brackets, self._bracket_tree)
+
+    def _replace_and_increment(self, matchObject: re.Match) -> str:
+        self._count += 1
+        replacement = ascii_letters[self._count]
+        new_expr = matchObject.group().replace('(', '').replace(')', '')
+        self._bracket_tree[replacement] = new_expr
+        return replacement
+
+    def _hash_brackets(self, expr: str) -> str:
+        """
+        Recursively hash expressions between parenthesis
+        so then can be referenced later when building
+        the order or operations tree
+        """
+        new_expr = re.sub(self.bracket_regex, self._replace_and_increment, expr)
+        # print(self._tree)
+        # print(new_expr)
+        if "(" in new_expr:
+            return self._hash_brackets(new_expr)
+        return new_expr
+
+    def _parse_terms(self, expr: str, operator: str) -> Tuple[str]:
+        splitexpr = expr.rsplit(operator)
+        if splitexpr[0] == expr: # No more operations found for given operator
+            return None
+        right = splitexpr.pop()
+        left = operator.join(splitexpr)
+        return left, right
+    
+    def _build_expression(self, expr: str) -> Expression:
+        for operator in self.operators:
+            terms = self._parse_terms(expr, operator)
+            print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
+            if not terms:
+                continue
+            left, right = terms[0], terms[1]
+            if sum((Operator.has_value(char) for char in expr)) > 1:
+                left = self._build_expression(left)
+                right = self._build_expression(right)
+            if sum((Operator.has_value(char) for char in expr)) == 1: # Base case: only one operation left in expression
+                # Check if term is a letter (hashed parenthesis expression)
+                if left in ascii_letters:
+                    print(f"Left {left} is actually {self._bracket_tree[left]}")
+                    left = self._build_expression(self._bracket_tree[left])
+                if right in ascii_letters:
+                    print(f"Right {right} is actually {self._bracket_tree[right]}")
+                    right = self._build_expression(self._bracket_tree[right])
+                return Expression(left, right, operator)
+    
+    def build(self) -> Expression:
+        expr = self._build_expression(self._expr_hashed_brackets)
+        expr._str_representation = self.expression_str
+        return expr
 
 class ExpressionTree:
     """
@@ -174,7 +247,7 @@ def main():
     print(f"Demo complex expression: {complex} = {complex.calculate()}")
     print(f"Expected result: {eval(str(complex).replace('^', '**'))}")
 
-
+    
 
 
 if __name__ == "__main__":
