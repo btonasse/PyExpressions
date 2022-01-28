@@ -3,13 +3,18 @@ from enum import Enum
 from string import ascii_letters
 from typing import Any, Tuple
 
+# Add proper logging
+# Add proper tests
+# Add support for negative numbers
+
 
 class Operator(Enum):
     EXPONENTIATION = "^"
     MULTIPLY = "*"
     DIVIDE = "/"
-    ADD = "+"
     SUBTRACT = "-"
+    ADD = "+"
+
     # MODULUS = '%'
     # FLOOR_DIVISION = '//'
 
@@ -33,19 +38,25 @@ class Operator(Enum):
 
 class Expression:
     def __init__(self, left, right, operator: str):
-        #self._no_funny_stuff(left, right, operator)
+        self._no_funny_stuff(left, right, operator)
         self.left = left
         self.right = right
-        self.operator = operator.replace('^', '**')
-        self._str_representation = str(left)+self.operator+str(right)
+        self.operator = operator.replace("^", "**")
+        self._str_representation = str(left) + self.operator + str(right)
 
     def _no_funny_stuff(self, left, right, operator):
         """
-        Prevent malicious code execution
+        Prevent malicious code execution by checking if terms are either another Expression or can be converted to a float
         """
-        if any(type(x) not in [int, float, Expression] for x in [left, right]):
-            raise ValueError(
-                "Operands can only be ints, floats, or other Expressions")
+        for term in [left, right]:
+            try:
+                float(term)
+            except (ValueError, TypeError):
+                if not isinstance(term, Expression):
+                    raise ValueError(
+                        "Operands can only be ints, floats, number strings or other Expressions"
+                    )
+
         if not Operator.has_value(operator):
             raise ValueError(
                 "Only basic arithmetic operators are valid: '+', '-', '*', '/', '^'"
@@ -60,7 +71,7 @@ class Expression:
         left = self.resolve_operand(self.left)
         right = self.resolve_operand(self.right)
         result = eval(left + self.operator + right)
-        print(left + self.operator + right + ' = ' + str(result))
+        # print(left + self.operator + right + ' = ' + str(result))
         return result
 
     def __str__(self) -> str:
@@ -77,6 +88,7 @@ class ExpressionBuilder:
     """
     Meta class that is not supposed to be called directly, but my the parse() method of the Expression class.
     """
+
     bracket_regex = re.compile(r"\([^\(\)]+\)")
     # Operators in priority ascending order
     operators = [member.value for member in reversed(list(Operator))]
@@ -91,7 +103,7 @@ class ExpressionBuilder:
 
     def _eval_brackets(self, expr: str) -> str:
         new_expr_str = re.sub(self.bracket_regex, self._test, expr)
-        if '(' in new_expr_str:
+        if "(" in new_expr_str:
             new_expr_str = self._eval_brackets(new_expr_str)
         return new_expr_str
 
@@ -112,15 +124,15 @@ class ExpressionBuilder:
     def _build_expression(self, expr: str) -> Expression:
         operator = self._get_lowest_priority_operator(expr)
         terms = self._parse_terms(expr, operator)
-        #print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
+        # print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
         left, right = terms[0], terms[1]
         if self._count_operators(left) > 0:
-            #print(f"Left is a larger expr: {left}")
+            # print(f"Left is a larger expr: {left}")
             left = self._build_expression(left)
             # print(
             #    f"out of left recursion. left = {left} type {type(left)}")
         if self._count_operators(right) > 0:
-            #print(f"Right is a larger expr: {right}")
+            # print(f"Right is a larger expr: {right}")
             right = self._build_expression(right)
             # print(
             #    f'out of right recursion right = {right} type {type(right)}')
@@ -128,7 +140,7 @@ class ExpressionBuilder:
 
     def build(self) -> Expression:
         expr_str = self._eval_brackets(self.expression_str)
-        print(f"String after brackets evaluated: {expr_str}")
+        # print(f"String after brackets evaluated: {expr_str}")
         expr = self._build_expression(expr_str)
         expr._str_representation = self.expression_str
         return expr
@@ -138,14 +150,10 @@ def main():
     test = "5+5/5+(5-5)/5"
     test2 = "5/5+(5*(5+5))"
     test3 = "(5-4)/5+(5*(5+5/2))-3-2+3*5^2-1-2-3"
-    demoexpr = "2*5"
-    simple = Expression.parse(demoexpr)
-    print(f"Demo simple expression: {simple} = {simple.calculate()}\n")
 
-    print(test3)
     complex = Expression.parse(test3)
     print(f"Demo complex expression: {complex} = {complex.calculate()}")
-    print(f"Expected result: {eval(str(complex).replace('^', '**'))}")
+    print(f"Expected result (using eval()): {eval(str(complex).replace('^', '**'))}")
 
 
 if __name__ == "__main__":
