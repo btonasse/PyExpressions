@@ -5,7 +5,7 @@ from typing import Any, Tuple
 
 
 class Operator(Enum):
-    EXPONENTIATION = "**"
+    EXPONENTIATION = "^"
     MULTIPLY = "*"
     DIVIDE = "/"
     ADD = "+"
@@ -32,11 +32,11 @@ class Operator(Enum):
 
 
 class Expression:
-    def __init__(self, left, right, operator):
+    def __init__(self, left, right, operator: str):
         self._no_funny_stuff(left, right, operator)
         self.left = left
         self.right = right
-        self.operator = operator
+        self.operator = operator.replace('^', '**')
         self._str_representation = ""
 
     def _no_funny_stuff(self, left, right, operator):
@@ -47,7 +47,7 @@ class Expression:
             raise ValueError("Operands can only be ints, floats, or other Expressions")
         if not Operator.has_value(operator):
             raise ValueError(
-                "Only basic arithmetic operators are valid: '+', '-', '*', '/', '**'"
+                "Only basic arithmetic operators are valid: '+', '-', '*', '/', '^'"
             )
 
     def resolve_operand(self, operand):
@@ -59,7 +59,7 @@ class Expression:
         left = self.resolve_operand(self.left)
         right = self.resolve_operand(self.right)
         result = eval(left + self.operator + right)
-        print(left + self.operator + right + ' = ' + str(result))
+        #print(left + self.operator + right + ' = ' + str(result))
         return result
 
     def __str__(self) -> str:
@@ -71,6 +71,7 @@ class Expression:
         expression = treeobj.build_expression()
         expression._str_representation = expr
         return expression
+
 
 
 class ExpressionTree:
@@ -138,7 +139,7 @@ class ExpressionTree:
         return expr
 
     def _parse_terms(self, expr: str) -> Tuple[str]:
-        operator = re.search(r"\W{1,2}", expr)[0]
+        operator = re.search(r"\W", expr)[0]
         operands = expr.split(operator)
         return operands[0], operands[1], operator
 
@@ -164,14 +165,16 @@ class ExpressionTree:
 def main():
     test = "5+5/5+(5-5)/5"
     test2 = "5/5+(5*(5+5))"
-    test3 = "(5-4)/5+(5*(5+5/2))-3-2+3*5**2-1-2-3"
+    test3 = "(5-4)/5+(5*(5+5/2))-3-2+3*5^2-1-2-3"
     demoexpr = "2*5"
     simple = Expression.parse(demoexpr)
     print(f"Demo simple expression: {simple} = {simple.calculate()}\n")
 
     complex = Expression.parse(test3)
     print(f"Demo complex expression: {complex} = {complex.calculate()}")
-    print(f"Expected result: {eval(str(complex))}")
+    print(f"Expected result: {eval(str(complex).replace('^', '**'))}")
+
+
 
 
 if __name__ == "__main__":
