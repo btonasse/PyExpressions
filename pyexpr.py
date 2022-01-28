@@ -124,23 +124,11 @@ class ExpressionBuilder:
             right = self._build_expression(right)
             # print(
             #    f'out of right recursion right = {right} type {type(right)}')
-        # Check if term is a letter (hashed parenthesis expression)
-        if str(left) in ascii_letters:
-            # print(
-            #    f"Left {left} is actually {self._bracket_tree[left]}")
-            left = self._build_expression(self._bracket_tree[left])
-            # print(
-            #    f'out of bracket left recursion. left = {left} type {type(left)}')
-        if str(right) in ascii_letters:
-            # print(
-            #    f"Right {right} is actually {self._bracket_tree[right]}")
-            right = self._build_expression(self._bracket_tree[right])
-            # print(
-            #    f'out of bracket right recursion right = {right} type {type(right)}')
         return Expression(left, right, operator)
 
     def build(self) -> Expression:
         expr_str = self._eval_brackets(self.expression_str)
+        print(f"String after brackets evaluated: {expr_str}")
         expr = self._build_expression(expr_str)
         expr._str_representation = self.expression_str
         return expr
