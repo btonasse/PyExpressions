@@ -121,46 +121,47 @@ class ExpressionBuilder:
 
     def _parse_terms(self, expr: str, operator: str) -> Tuple[str]:
         splitexpr = expr.rsplit(operator)
-        if splitexpr[0] == expr:  # No more operations found for given operator
-            return None
         right = splitexpr.pop()
         left = operator.join(splitexpr)
         return left, right
 
-    def _build_expression(self, expr: str) -> Expression:
+    def _get_lowest_priority_operator(self, expr: str) -> str:
         for operator in self.operators:
-            terms = self._parse_terms(expr, operator)
-            #print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
-            if not terms:
-                continue
-            print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
-            left, right = terms[0], terms[1]
-            if sum((Operator.has_value(char) for char in left)) > 1:
-                print(f"Left is a larger expr: {left}")
-                left = self._build_expression(left)
-                print(
-                    f"out of left recursion. left = {left} type {type(left)}")
-            if sum((Operator.has_value(char) for char in right)) > 1:
-                print(f"Right is a larger expr: {right}")
-                right = self._build_expression(right)
-                print(
-                    f'out of right recursion right = {right} type {type(right)}')
-            # Base case: only one operation left in expression
-            if sum((Operator.has_value(char) for char in expr)) == 1:
-                # Check if term is a letter (hashed parenthesis expression)
-                if left in ascii_letters:
-                    print(
-                        f"Left {left} is actually {self._bracket_tree[left]}")
-                    left = self._build_expression(self._bracket_tree[left])
-                    print(
-                        f'out of bracket left recursion. left = {left} type {type(left)}')
-                if right in ascii_letters:
-                    print(
-                        f"Right {right} is actually {self._bracket_tree[right]}")
-                    right = self._build_expression(self._bracket_tree[right])
-                    print(
-                        f'out of bracket right recursion right = {right} type {type(right)}')
-                return Expression(left, right, operator)
+            if operator in expr:
+                return operator
+
+    def _count_operators(self, expr: str) -> bool:
+        return sum((Operator.has_value(char) for char in expr))
+
+    def _build_expression(self, expr: str) -> Expression:
+        operator = self._get_lowest_priority_operator(expr)
+        terms = self._parse_terms(expr, operator)
+        #print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
+        left, right = terms[0], terms[1]
+        if self._count_operators(left) > 0:
+            #print(f"Left is a larger expr: {left}")
+            left = self._build_expression(left)
+            # print(
+            #    f"out of left recursion. left = {left} type {type(left)}")
+        if self._count_operators(right) > 0:
+            #print(f"Right is a larger expr: {right}")
+            right = self._build_expression(right)
+            # print(
+            #    f'out of right recursion right = {right} type {type(right)}')
+        # Check if term is a letter (hashed parenthesis expression)
+        if str(left) in ascii_letters:
+            # print(
+            #    f"Left {left} is actually {self._bracket_tree[left]}")
+            left = self._build_expression(self._bracket_tree[left])
+            # print(
+            #    f'out of bracket left recursion. left = {left} type {type(left)}')
+        if str(right) in ascii_letters:
+            # print(
+            #    f"Right {right} is actually {self._bracket_tree[right]}")
+            right = self._build_expression(self._bracket_tree[right])
+            # print(
+            #    f'out of bracket right recursion right = {right} type {type(right)}')
+        return Expression(left, right, operator)
 
     def build(self) -> Expression:
         expr = self._build_expression(self._expr_hashed_brackets)
