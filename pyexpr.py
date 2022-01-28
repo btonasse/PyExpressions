@@ -60,20 +60,11 @@ class Expression:
         left = self.resolve_operand(self.left)
         right = self.resolve_operand(self.right)
         result = eval(left + self.operator + right)
-        #print(left + self.operator + right + ' = ' + str(result))
+        print(left + self.operator + right + ' = ' + str(result))
         return result
 
     def __str__(self) -> str:
         return self._str_representation
-
-    """
-    @classmethod
-    def parse(cls, expr: str):
-        treeobj = ExpressionTree(expr)
-        expression = treeobj.build_expression()
-        expression._str_representation = expr
-        return expression
-    """
 
     @classmethod
     def parse(cls, expr: str):
@@ -86,38 +77,23 @@ class ExpressionBuilder:
     """
     Meta class that is not supposed to be called directly, but my the parse() method of the Expression class.
     """
-    bracket_regex = r"\([^\(\)]+\)"
-    # operation_regex = r"(?=(\d+\.?\d*%\d+\.?\d*))"  # Replace % with the actual escaped operand
+    bracket_regex = re.compile(r"\([^\(\)]+\)")
     # Operators in priority ascending order
     operators = [member.value for member in reversed(list(Operator))]
 
     def __init__(self, expr: str):
-        self._count = -1
-        self._bracket_tree = {}
         self.expression_str = expr
-        self._expr_hashed_brackets = self._hash_brackets(self.expression_str)
-        print(self._expr_hashed_brackets, self._bracket_tree)
 
-    def _replace_and_increment(self, matchObject: re.Match) -> str:
-        self._count += 1
-        replacement = ascii_letters[self._count]
-        new_expr = matchObject.group().replace('(', '').replace(')', '')
-        self._bracket_tree[replacement] = new_expr
-        return replacement
+    def _test(self, matchObject: re.Match) -> str:
+        match = matchObject.group()[1:-1]
+        expr = self._build_expression(match)
+        return str(expr.calculate())
 
-    def _hash_brackets(self, expr: str) -> str:
-        """
-        Recursively hash expressions between parenthesis
-        so then can be referenced later when building
-        the order or operations tree
-        """
-        new_expr = re.sub(self.bracket_regex,
-                          self._replace_and_increment, expr)
-        # print(self._tree)
-        # print(new_expr)
-        if "(" in new_expr:
-            return self._hash_brackets(new_expr)
-        return new_expr
+    def _eval_brackets(self, expr: str) -> str:
+        new_expr_str = re.sub(self.bracket_regex, self._test, expr)
+        if '(' in new_expr_str:
+            new_expr_str = self._eval_brackets(new_expr_str)
+        return new_expr_str
 
     def _parse_terms(self, expr: str, operator: str) -> Tuple[str]:
         splitexpr = expr.rsplit(operator)
@@ -164,100 +140,10 @@ class ExpressionBuilder:
         return Expression(left, right, operator)
 
     def build(self) -> Expression:
-        expr = self._build_expression(self._expr_hashed_brackets)
+        expr_str = self._eval_brackets(self.expression_str)
+        expr = self._build_expression(expr_str)
         expr._str_representation = self.expression_str
         return expr
-
-
-class ExpressionTree:
-    """
-    Class to incrementally replace regex matches with a string+count.
-    Replacements are tracked in a dictionary
-    """
-
-    bracket_regex = r"\([^\(\)]+\)"
-    # Replace % with the actual escaped operand
-    operation_regex = r"(?:(?:\d+\.?\d*)|\w)%(?:(?:\d+\.?\d*)|\w)"
-
-    def __init__(self, expr: str):
-        self.expression_str = expr
-        self._count = -1
-        self._tree = {}
-        self._root = self._hash_brackets(self.expression_str)
-        for element in Operator:
-            self._root = self._hash_operations(self._root, element)
-        self._hash_operations_in_brackets()
-        print(self._tree)
-
-    def _replace_and_increment(self, matchObject: re.Match) -> str:
-        self._count += 1
-        replacement = ascii_letters[self._count]
-        new_expr = matchObject.group()
-        self._tree[replacement] = new_expr
-        return replacement
-
-    def _hash_brackets(self, expr: str) -> str:
-        """
-        Recursively hash expressions between parenthesis
-        so then can be referenced later when building
-        the order or operations tree
-        """
-        new_expr = re.sub(self.bracket_regex,
-                          self._replace_and_increment, expr)
-        # print(self._tree)
-        # print(new_expr)
-        if "(" in new_expr:
-            return self._hash_brackets(new_expr)
-        return new_expr
-
-    def _hash_operations(self, expr: str, operator: Operator) -> str:
-        operator_str = operator.value
-        regex = self.operation_regex.replace(
-            "%", Operator.get_regex_escaped_value(operator)
-        )
-        new_expr = re.sub(regex, self._replace_and_increment, expr)
-        # print(self._tree)
-        # print(new_expr)
-        if operator_str in new_expr:
-            return self._hash_operations(new_expr, operator)
-        return new_expr
-
-    def _hash_operations_in_brackets(self) -> None:
-        for k, v in dict(self._tree).items():
-            if "(" in v:
-                for element in Operator:
-                    if sum((Operator.has_value(char) for char in self._tree[k])) > 1:
-                        self._tree[k] = self._hash_operations(v, element)
-                # Remove unnecessary brackets from expression
-                self._tree[k] = self._tree[k].replace("(", "").replace(")", "")
-
-    def build_expression(self) -> Expression:
-        root_expr = self._tree[self._root]
-        expr = self._build_node(root_expr)
-        return expr
-
-    def _parse_terms(self, expr: str) -> Tuple[str]:
-        operator = re.search(r"\W", expr)[0]
-        operands = expr.split(operator)
-        return operands[0], operands[1], operator
-
-    def _build_node(self, root_expr: str) -> Expression:
-        left, right, operator = self._parse_terms(root_expr)
-        try:
-            if int(left) == float(left):
-                left = int(left)
-            else:
-                left = float(left)
-        except ValueError:
-            left = self._build_node(self._tree[left])
-        try:
-            if int(right) == float(right):
-                right = int(right)
-            else:
-                right = float(right)
-        except ValueError:
-            right = self._build_node(self._tree[right])
-        return Expression(left, right, operator)
 
 
 def main():
