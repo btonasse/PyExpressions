@@ -87,6 +87,8 @@ class ExpressionTree:
         self._count = -1
         self._tree = {}
         self._root = self._hash_brackets(self.expression_str)
+        for element in Operator:
+            self._root = self._hash_operations(self._root, element)
         self._hash_operations_in_brackets()
         print(self._tree)
 
@@ -108,8 +110,6 @@ class ExpressionTree:
         # print(new_expr)
         if "(" in new_expr:
             return self._hash_brackets(new_expr)
-        for element in Operator:
-            new_expr = self._hash_operations(new_expr, element)
         return new_expr
 
     def _hash_operations(self, expr: str, operator: Operator) -> str:
