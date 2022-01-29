@@ -13,14 +13,16 @@ Expression:
     Use the class method parse() to parse a string representation of an expression.
     To evaluate the expression, call the method calculate()
 ExpressionBuilder:
-    Metaclass that is used to build a tree of Expressions
-    to represent complex arithmetic expressions. Should not be instantiated directly.
+    Class that is used to build a tree of Expressions
+    that represent complex arithmetic expressions. Should not be instantiated directly.
 """
 
+from __future__ import annotations
 import re
 from enum import Enum
 from typing import Any, Tuple, Union
 
+# Todo:
 # Add proper logging
 # Add proper tests
 # Add support for negative numbers (replace - with +- but check for things like 2/-2)
@@ -38,6 +40,7 @@ class Operator(Enum):
         get_regex_escaped_value(element):
             Returns an escaped representation of the member's value (to be used in regex patterns).
     """
+
     EXPONENTIATION = "^"
     MULTIPLY = "*"
     DIVIDE = "/"
@@ -55,7 +58,7 @@ class Operator(Enum):
         return val in (x.value for x in cls)
 
     @classmethod
-    def get_regex_escaped_value(cls, member) -> str:
+    def get_regex_escaped_value(cls, member: Operator) -> str:
         """
         Returns an escaped representation of the member's value (to be used in regex patterns)
         """
@@ -72,7 +75,10 @@ class Expression:
     Use the class method parse() to parse a string representation of an expression.
     To evaluate the expression, call the method calculate()
     """
-    def __init__(self, left, right, operator: str):
+
+    def __init__(
+        self, left: Union[Expression, str], right: Union[Expression, str], operator: str
+    ) -> None:
         self._no_funny_stuff(left, right, operator)
         self.left = left
         self.right = right
@@ -80,7 +86,9 @@ class Expression:
         self.operator = operator.replace("^", "**")
         self._str_representation = str(left) + self.operator + str(right)
 
-    def _no_funny_stuff(self, left, right, operator):
+    def _no_funny_stuff(
+        self, left: Union[Expression, str], right: Union[Expression, str], operator: str
+    ) -> None:
         """
         Prevent malicious code execution by checking the following:
             1) Operands must be string representations of floats/ints or other Expressions.
@@ -100,7 +108,7 @@ class Expression:
                 "Only basic arithmetic operators are valid: '+', '-', '*', '/', '^'"
             )
 
-    def resolve_operand(self, operand) -> str:
+    def resolve_operand(self, operand: Union[Expression, str]) -> str:
         """
         Determine the nature of an operand.
         If operando is a string, return it. If it's an Expression,
@@ -123,8 +131,11 @@ class Expression:
     def __str__(self) -> str:
         return self._str_representation
 
+    def __eq__(self, other: Union[Expression, int, float]) -> bool:
+        pass
+
     @classmethod
-    def parse(cls, expr: str):
+    def parse(cls, expr: str) -> Expression:
         """
         Class method used to return an instance of this class
         by parsing a string representation of an expression.
@@ -145,7 +156,7 @@ class ExpressionBuilder:
     # Operators in priority ascending order
     operators = [member.value for member in reversed(list(Operator))]
 
-    def __init__(self, expr: str):
+    def __init__(self, expr: str) -> None:
         self.expression_str = expr
 
     def _evaluate_match(self, match_object: re.Match) -> str:
@@ -233,7 +244,7 @@ class ExpressionBuilder:
         return expr
 
 
-def main():
+def main() -> None:
     """
     Demo function.
     """
