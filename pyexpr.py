@@ -98,11 +98,11 @@ class Expression:
         for term in [left, right]:
             try:
                 float(term)
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as err:
                 if not isinstance(term, Expression):
                     raise ValueError(
                         "Operands can only be ints, floats, number strings or other Expressions"
-                    )
+                    ) from err
 
         if not Operator.has_value(operator):
             raise ValueError(
