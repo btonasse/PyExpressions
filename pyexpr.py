@@ -131,8 +131,10 @@ class Expression:
     def __str__(self) -> str:
         return self._str_representation
 
-    def __eq__(self, other: Union[Expression, int, float]) -> bool:
-        pass
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, Expression):
+            return self.calculate() == other.calculate()
+        return self.calculate() == other
 
     @classmethod
     def parse(cls, expr: str) -> Expression:
