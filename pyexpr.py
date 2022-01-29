@@ -1,14 +1,43 @@
+"""
+Emulate the eval() function, but only for representing
+and evaluating complex arithmetic expressions via a tree of Expression objects
+(i.e. preventing the execution of arbitrary code)
+
+This module contains three classes:
+
+Operator:
+    Enum class to facilitate the use of arithmetic operators
+Expression:
+    Represents a simple expression (left operand + operator + right operand).
+    Operands must be string representations of floats/ints or other Expressions.
+    Use the class method parse() to parse a string representation of an expression.
+    To evaluate the expression, call the method calculate()
+ExpressionBuilder:
+    Metaclass that is used to build a tree of Expressions
+    to represent complex arithmetic expressions. Should not be instantiated directly.
+"""
+
 import re
 from enum import Enum
-from string import ascii_letters
-from typing import Any, Tuple
+from typing import Any, Tuple, Union
 
 # Add proper logging
 # Add proper tests
-# Add support for negative numbers
+# Add support for negative numbers (replace - with +- but check for things like 2/-2)
+# Move parenthesis logic to parse_terms
+# so brackets can also be represented as persistent expressions in the expression tree
 
 
 class Operator(Enum):
+    """
+    Enum class to facilitate the use of arithmetic operators.
+    Members are ordered according to the mathematical order of operations.
+    Has the following utility class methods:
+        has_value(val):
+            Checks if val is one of the values of this enum.
+        get_regex_escaped_value(element):
+            Returns an escaped representation of the member's value (to be used in regex patterns).
+    """
     EXPONENTIATION = "^"
     MULTIPLY = "*"
     DIVIDE = "/"
@@ -26,27 +55,36 @@ class Operator(Enum):
         return val in (x.value for x in cls)
 
     @classmethod
-    def get_regex_escaped_value(cls, element) -> str:
+    def get_regex_escaped_value(cls, member) -> str:
         """
-        Returned an escaped representation of the value for regex patterns
+        Returns an escaped representation of the member's value (to be used in regex patterns)
         """
         escaped = ""
-        for char in element.value:
+        for char in member.value:
             escaped += f"\\{char}"
         return escaped
 
 
 class Expression:
+    """
+    Represents a simple expression (left operand + operator + right operand).
+    Operands must be string representations of floats/ints or other Expressions.
+    Use the class method parse() to parse a string representation of an expression.
+    To evaluate the expression, call the method calculate()
+    """
     def __init__(self, left, right, operator: str):
         self._no_funny_stuff(left, right, operator)
         self.left = left
         self.right = right
+        # Replace standard representation of exponentiation with the python ** operator
         self.operator = operator.replace("^", "**")
         self._str_representation = str(left) + self.operator + str(right)
 
     def _no_funny_stuff(self, left, right, operator):
         """
-        Prevent malicious code execution by checking if terms are either another Expression or can be converted to a float
+        Prevent malicious code execution by checking the following:
+            1) Operands must be string representations of floats/ints or other Expressions.
+            2) Operator must be a member of the Operator class
         """
         for term in [left, right]:
             try:
@@ -62,12 +100,20 @@ class Expression:
                 "Only basic arithmetic operators are valid: '+', '-', '*', '/', '^'"
             )
 
-    def resolve_operand(self, operand):
+    def resolve_operand(self, operand) -> str:
+        """
+        Determine the nature of an operand.
+        If operando is a string, return it. If it's an Expression,
+        evaluate it and return the result as a string.
+        """
         if isinstance(operand, Expression):
             return str(operand.calculate())
         return str(operand)
 
-    def calculate(self):
+    def calculate(self) -> Union[int, float]:
+        """
+        Evaluate expression.
+        """
         left = self.resolve_operand(self.left)
         right = self.resolve_operand(self.right)
         result = eval(left + self.operator + right)
@@ -79,6 +125,11 @@ class Expression:
 
     @classmethod
     def parse(cls, expr: str):
+        """
+        Class method used to return an instance of this class
+        by parsing a string representation of an expression.
+        This is done via the ExpressionBuilder metaclass.
+        """
         builder = ExpressionBuilder(expr)
         expression = builder.build()
         return expression
@@ -86,7 +137,8 @@ class Expression:
 
 class ExpressionBuilder:
     """
-    Meta class that is not supposed to be called directly, but my the parse() method of the Expression class.
+    Metaclass that is used to build a tree of Expressions
+    to represent complex arithmetic expressions. Should not be instantiated directly.
     """
 
     bracket_regex = re.compile(r"\([^\(\)]+\)")
@@ -96,32 +148,61 @@ class ExpressionBuilder:
     def __init__(self, expr: str):
         self.expression_str = expr
 
-    def _test(self, matchObject: re.Match) -> str:
-        match = matchObject.group()[1:-1]
+    def _evaluate_match(self, match_object: re.Match) -> str:
+        """
+        Evaluates the result of a simple expression inside brackets.
+        This is called by _eval_brackets() and accepts a match object
+        containing the expression to be evaluated.
+        """
+        match = match_object.group()[1:-1]
         expr = self._build_expression(match)
         return str(expr.calculate())
 
     def _eval_brackets(self, expr: str) -> str:
-        new_expr_str = re.sub(self.bracket_regex, self._test, expr)
+        """
+        Use regex to locate expressions inside brackets in order to evaluate them
+        by calling _evaluate_match(). The expression is then replaced by the result.
+        The regex pattern does not match bracket expressions that contain other bracket expressions.
+        This function is therefore called recursively if brackets are still found after evaluation.
+        """
+        new_expr_str = re.sub(self.bracket_regex, self._evaluate_match, expr)
         if "(" in new_expr_str:
             new_expr_str = self._eval_brackets(new_expr_str)
         return new_expr_str
 
     def _parse_terms(self, expr: str, operator: str) -> Tuple[str]:
+        """
+        Splits a string representation of an expression at the rightmost given operator.
+        """
         splitexpr = expr.rsplit(operator)
         right = splitexpr.pop()
         left = operator.join(splitexpr)
         return left, right
 
     def _get_lowest_priority_operator(self, expr: str) -> str:
+        """
+        Finds the lowest priority operator present in a given expression string.
+        """
         for operator in self.operators:
             if operator in expr:
                 return operator
 
-    def _count_operators(self, expr: str) -> bool:
+    def _count_operators(self, expr: str) -> int:
+        """
+        Count how many arithmetic operators are present in a given expression string.
+        This is used to determine whether the given expression is ready to be turned
+        into an instance of the Expression class, since this class is supposed to represent
+        a single operation (e.g. 5+4, but not 5+4-2).
+        """
         return sum((Operator.has_value(char) for char in expr))
 
     def _build_expression(self, expr: str) -> Expression:
+        """
+        Recursively build the expression tree, from the lowest to the highest priority operators.
+        Currently expressions inside brackets are evaluated first and replaced by their result,
+        but in the future the code will be refactored to represent them also as a child Expression
+        built by this method.
+        """
         operator = self._get_lowest_priority_operator(expr)
         terms = self._parse_terms(expr, operator)
         # print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
@@ -139,6 +220,12 @@ class ExpressionBuilder:
         return Expression(left, right, operator)
 
     def build(self) -> Expression:
+        """
+        This is called by the parse() class method of the Expression class
+        to initiate the build of the Expression instance.
+        This method not only instantiates and return an Expression,
+        but also populate their string representation attribute (_str_representation).
+        """
         expr_str = self._eval_brackets(self.expression_str)
         # print(f"String after brackets evaluated: {expr_str}")
         expr = self._build_expression(expr_str)
@@ -147,13 +234,16 @@ class ExpressionBuilder:
 
 
 def main():
-    test = "5+5/5+(5-5)/5"
-    test2 = "5/5+(5*(5+5))"
+    """
+    Demo function.
+    """
+    # test = "5+5/5+(5-5)/5"
+    # test2 = "5/5+(5*(5+5))"
     test3 = "(5-4)/5+(5*(5+5/2))-3-2+3*5^2-1-2-3"
 
-    complex = Expression.parse(test3)
-    print(f"Demo complex expression: {complex} = {complex.calculate()}")
-    print(f"Expected result (using eval()): {eval(str(complex).replace('^', '**'))}")
+    expr = Expression.parse(test3)
+    print(f"Demo complex expression: {expr} = {expr.calculate()}")
+    print(f"Expected result (using eval()): {eval(str(expr).replace('^', '**'))}")
 
 
 if __name__ == "__main__":
