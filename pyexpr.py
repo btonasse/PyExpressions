@@ -79,15 +79,16 @@ class Expression:
     def __init__(
         self, left: Union[Expression, str], right: Union[Expression, str], operator: str
     ) -> None:
-        self._no_funny_stuff(left, right, operator)
+        self.no_funny_stuff(left, right, operator)
         self.left = left
         self.right = right
         # Replace standard representation of exponentiation with the python ** operator
         self.operator = operator.replace("^", "**")
         self._str_representation = str(left) + self.operator + str(right)
 
-    def _no_funny_stuff(
-        self, left: Union[Expression, str], right: Union[Expression, str], operator: str
+    @staticmethod
+    def no_funny_stuff(
+        left: Union[Expression, str], right: Union[Expression, str], operator: str
     ) -> None:
         """
         Prevent malicious code execution by checking the following:
@@ -108,7 +109,8 @@ class Expression:
                 "Only basic arithmetic operators are valid: '+', '-', '*', '/', '^'"
             )
 
-    def resolve_operand(self, operand: Union[Expression, str]) -> str:
+    @staticmethod
+    def resolve_operand(operand: Union[Expression, str]) -> str:
         """
         Determine the nature of an operand.
         If operando is a string, return it. If it's an Expression,
@@ -183,7 +185,8 @@ class ExpressionBuilder:
             new_expr_str = self._eval_brackets(new_expr_str)
         return new_expr_str
 
-    def _parse_terms(self, expr: str, operator: str) -> Tuple[str]:
+    @staticmethod
+    def parse_terms(expr: str, operator: str) -> Tuple[str]:
         """
         Splits a string representation of an expression at the rightmost given operator.
         """
@@ -200,7 +203,8 @@ class ExpressionBuilder:
             if operator in expr:
                 return operator
 
-    def _count_operators(self, expr: str) -> int:
+    @staticmethod
+    def count_operators(expr: str) -> int:
         """
         Count how many arithmetic operators are present in a given expression string.
         This is used to determine whether the given expression is ready to be turned
@@ -217,15 +221,15 @@ class ExpressionBuilder:
         built by this method.
         """
         operator = self._get_lowest_priority_operator(expr)
-        terms = self._parse_terms(expr, operator)
+        terms = self.parse_terms(expr, operator)
         # print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
         left, right = terms[0], terms[1]
-        if self._count_operators(left) > 0:
+        if self.count_operators(left) > 0:
             # print(f"Left is a larger expr: {left}")
             left = self._build_expression(left)
             # print(
             #    f"out of left recursion. left = {left} type {type(left)}")
-        if self._count_operators(right) > 0:
+        if self.count_operators(right) > 0:
             # print(f"Right is a larger expr: {right}")
             right = self._build_expression(right)
             # print(
