@@ -25,7 +25,6 @@ from typing import Any, Tuple, Union
 # Todo:
 # Add proper logging
 # Add proper tests
-# Add support for negative numbers (replace - with +- but check for things like 2/-2)
 # Move parenthesis logic to parse_terms
 # so brackets can also be represented as persistent expressions in the expression tree
 
@@ -56,16 +55,6 @@ class Operator(Enum):
         Checks if val is one of the values of this enum
         """
         return val in (x.value for x in cls)
-
-    @classmethod
-    def get_regex_escaped_value(cls, member: Operator) -> str:
-        """
-        Returns an escaped representation of the member's value (to be used in regex patterns)
-        """
-        escaped = ""
-        for char in member.value:
-            escaped += f"\\{char}"
-        return escaped
 
 
 class Expression:
@@ -156,8 +145,11 @@ class ExpressionBuilder:
     to represent complex arithmetic expressions. Should not be instantiated directly.
     """
 
-    bracket_regex = re.compile(r"\([^\(\)]+\)")
-    # Operators in priority ascending order
+    bracket_regex: re.Pattern = re.compile(r"\([^\(\)]+\)")
+    # Regex to find an operator (replace % with the operator to be searched)
+    # The negative lookbehind is there to prevent false matches when dealing with negative numbers
+    operator_regex: str = r".(?<!\/|\(|-)(\%)"
+    # Get operators in ascending order of priority
     operators = [member.value for member in reversed(list(Operator))]
 
     def __init__(self, expr: str) -> None:
@@ -185,34 +177,55 @@ class ExpressionBuilder:
             new_expr_str = self._eval_brackets(new_expr_str)
         return new_expr_str
 
-    @staticmethod
-    def parse_terms(expr: str, operator: str) -> Tuple[str]:
+    @classmethod
+    def _compile_operator_regex(cls, operator: str) -> re.Pattern:
+        """
+        Compile a re.Pattern to find operators in an expression string
+        by replacing the placeholder '%' with the given operator in self.operator_regex
+        """
+        return re.compile(cls.operator_regex.replace("%", operator))
+
+    @classmethod
+    def parse_terms(cls, expr: str, operator: str) -> Tuple[str]:
         """
         Splits a string representation of an expression at the rightmost given operator.
+        This method assumes the operator exists in the string
+        (i.e. it should be called after _get_lowest_priority_operator())
         """
-        splitexpr = expr.rsplit(operator)
-        right = splitexpr.pop()
-        left = operator.join(splitexpr)
+        # Compile pattern, replacing % with the actual operator being searched
+        pat = cls._compile_operator_regex(operator)
+        # Get index of rightmost match
+        i = list(re.finditer(pat, expr))[-1].start() + 1
+        # Split string at that index, omitting the operator itself
+        left, right = expr[:i], expr[i + 1 :]
         return left, right
 
-    def _get_lowest_priority_operator(self, expr: str) -> str:
+    @classmethod
+    def _get_lowest_priority_operator(cls, expr: str) -> str:
         """
         Finds the lowest priority operator present in a given expression string.
         """
-        for operator in self.operators:
-            if operator in expr:
+        for operator in cls.operators:
+            pat = cls._compile_operator_regex(operator)
+            if re.search(pat, expr):
                 return operator
 
-    @staticmethod
-    def count_operators(expr: str) -> int:
+    @classmethod
+    def count_operators(cls, expr: str) -> int:
         """
         Count how many arithmetic operators are present in a given expression string.
         This is used to determine whether the given expression is ready to be turned
         into an instance of the Expression class, since this class is supposed to represent
         a single operation (e.g. 5+4, but not 5+4-2).
         """
-        return sum((Operator.has_value(char) for char in expr))
-
+        count = 0
+        for operator in cls.operators:
+            pat = cls._compile_operator_regex(operator)
+            matches = re.findall(pat, expr)
+            if matches:
+                count += len(matches)
+        return count
+    
     def _build_expression(self, expr: str) -> Expression:
         """
         Recursively build the expression tree, from the lowest to the highest priority operators.
@@ -256,7 +269,7 @@ def main() -> None:
     """
     # test = "5+5/5+(5-5)/5"
     # test2 = "5/5+(5*(5+5))"
-    test3 = "(5-4)/5+(5*(5+5/2))-3-2+3*5^2-1-2-3"
+    test3 = "(5-4)/5+(5*(5+5/-2))-3-2+3*5^2-1-2-3"
 
     expr = Expression.parse(test3)
     print(f"Demo complex expression: {expr} = {expr.calculate()}")
