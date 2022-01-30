@@ -19,15 +19,12 @@ ExpressionBuilder:
 
 from __future__ import annotations
 import re
-import string
 from enum import Enum
 from typing import Any, Tuple, Union
 
 # Todo:
 # Add proper logging
 # Add proper tests
-# Move parenthesis logic to parse_terms
-# so brackets can also be represented as persistent expressions in the expression tree
 
 
 class Operator(Enum):
@@ -67,7 +64,11 @@ class Expression:
     """
 
     def __init__(
-        self, left: Union[Expression, str], right: Union[Expression, str], operator: str
+        self,
+        left: Union[Expression, str],
+        right: Union[Expression, str],
+        operator: str,
+        is_within_brackets: bool = False,
     ) -> None:
         self.no_funny_stuff(left, right, operator)
         self.left = left
@@ -75,6 +76,8 @@ class Expression:
         # Replace standard representation of exponentiation with the python ** operator
         self.operator = operator.replace("^", "**")
         self._str_representation = str(left) + self.operator + str(right)
+        if is_within_brackets:
+            self._str_representation = "(" + self._str_representation + ")"
 
     @staticmethod
     def no_funny_stuff(
@@ -156,26 +159,29 @@ class ExpressionBuilder:
     def __init__(self, expr: str) -> None:
         self.expression_str = expr
 
-    def _evaluate_match(self, match_object: re.Match) -> str:
+    @staticmethod
+    def _apply_mask(match_object: re.Match) -> str:
         """
-        Evaluates the result of a simple expression inside brackets.
-        This is called by _eval_brackets() and accepts a match object
-        containing the expression to be evaluated.
+        Replaces a regex match with a string of B's of the same length.
+        This method is called by _mask_brackets().
         """
-        match = match_object.group()[1:-1]
-        expr = self._build_expression(match)
-        return str(expr.calculate())
+        match = match_object.group()
+        mask = "B" * len(match)
+        return mask
 
-    def _eval_brackets(self, expr: str) -> str:
+    @classmethod
+    def _mask_brackets(cls, expr: str) -> str:
         """
-        Use regex to locate expressions inside brackets in order to evaluate them
-        by calling _evaluate_match(). The expression is then replaced by the result.
-        The regex pattern does not match bracket expressions that contain other bracket expressions.
-        This function is therefore called recursively if brackets are still found after evaluation.
+        Finds all bracket expressions in an expression string
+        and replaces them with a string of B's of the same length.
+        This needs to be called before calling any other methods
+        that read of manipulate expression terms and operators,
+        so that the operators inside the bracket expressions
+        don't interfere with those methods.
         """
-        new_expr_str = re.sub(self.bracket_regex, self._evaluate_match, expr)
+        new_expr_str = re.sub(cls.bracket_regex, cls._apply_mask, expr)
         if "(" in new_expr_str:
-            new_expr_str = self._eval_brackets(new_expr_str)
+            new_expr_str = cls._mask_brackets(new_expr_str)
         return new_expr_str
 
     @classmethod
@@ -193,10 +199,11 @@ class ExpressionBuilder:
         This method assumes the operator exists in the string
         (i.e. it should be called after _get_lowest_priority_operator())
         """
+        masked_expr = cls._mask_brackets(expr)
         # Compile pattern, replacing % with the actual operator being searched
         pat = cls._compile_operator_regex(operator)
         # Get index of rightmost match
-        i = list(re.finditer(pat, expr))[-1].start()
+        i = list(re.finditer(pat, masked_expr))[-1].start()
         # Split string at that index, omitting the operator itself
         left, right = expr[:i], expr[i + 1 :]
         return left, right
@@ -206,9 +213,10 @@ class ExpressionBuilder:
         """
         Finds the lowest priority operator present in a given expression string.
         """
+        masked_expr = cls._mask_brackets(expr)
         for operator in cls.operators:
             pat = cls._compile_operator_regex(operator)
-            if re.search(pat, expr):
+            if re.search(pat, masked_expr):
                 return operator
 
     @classmethod
@@ -226,13 +234,12 @@ class ExpressionBuilder:
             if matches:
                 count += len(matches)
         return count
-    
-    def _build_expression(self, expr: str) -> Expression:
+
+    def _build_expression(
+        self, expr: str, is_within_brackets: bool = False
+    ) -> Expression:
         """
         Recursively build the expression tree, from the lowest to the highest priority operators.
-        Currently expressions inside brackets are evaluated first and replaced by their result,
-        but in the future the code will be refactored to represent them also as a child Expression
-        built by this method.
         """
         operator = self._get_lowest_priority_operator(expr)
         terms = self.parse_terms(expr, operator)
@@ -240,15 +247,21 @@ class ExpressionBuilder:
         left, right = terms[0], terms[1]
         if self.count_operators(left) > 0:
             # print(f"Left is a larger expr: {left}")
-            left = self._build_expression(left)
+            if left.startswith("(") and left.endswith(")"):
+                left = self._build_expression(left[1:-1], True)
+            else:
+                left = self._build_expression(left)
             # print(
             #    f"out of left recursion. left = {left} type {type(left)}")
         if self.count_operators(right) > 0:
             # print(f"Right is a larger expr: {right}")
-            right = self._build_expression(right)
+            if right.startswith("(") and right.endswith(")"):
+                right = self._build_expression(right[1:-1], True)
+            else:
+                right = self._build_expression(right)
             # print(
             #    f'out of right recursion right = {right} type {type(right)}')
-        return Expression(left, right, operator)
+        return Expression(left, right, operator, is_within_brackets)
 
     def build(self) -> Expression:
         """
@@ -257,10 +270,7 @@ class ExpressionBuilder:
         This method not only instantiates and return an Expression,
         but also populate their string representation attribute (_str_representation).
         """
-        expr_str = self._eval_brackets(self.expression_str)
-        # print(f"String after brackets evaluated: {expr_str}")
-        expr = self._build_expression(expr_str)
-        expr._str_representation = self.expression_str
+        expr = self._build_expression(self.expression_str)
         return expr
 
 
