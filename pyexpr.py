@@ -270,7 +270,10 @@ class ExpressionBuilder:
         This method not only instantiates and return an Expression,
         but also populate their string representation attribute (_str_representation).
         """
-        expr = self._build_expression(self.expression_str)
+        try:
+            expr = self._build_expression(self.expression_str)
+        except TypeError as err:
+            raise ValueError("Failed to build expression. Expression string might be invalid.") from err
         return expr
 
 
