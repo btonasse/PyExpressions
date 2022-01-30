@@ -19,11 +19,14 @@ ExpressionBuilder:
 
 from __future__ import annotations
 import re
+import logging
 from enum import Enum
 from typing import Any, Tuple, Union
 
+# Add a null handler to the logger in case this becomes an imported module
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
 # Todo:
-# Add proper logging
 # Add proper tests
 
 
@@ -68,6 +71,7 @@ class Expression:
         operator: str,
         is_within_brackets: bool = False,
     ) -> None:
+        self.logger = logging.getLogger(__name__)
         self.no_funny_stuff(left, right, operator)
         self.left = left
         self.right = right
@@ -118,11 +122,17 @@ class Expression:
         left = self.resolve_operand(self.left)
         right = self.resolve_operand(self.right)
         result = eval(left + self.operator + right)
-        # print(left + self.operator + right + ' = ' + str(result))
+        self.logger.debug(
+            "Calculating expression: %s",
+            left + self.operator + right + " = " + str(result),
+        )
         return result
 
     def __str__(self) -> str:
         return self._str_representation
+
+    def __repr__(self) -> str:
+        return f"<Expression: {self._str_representation}>"
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Expression):
@@ -156,6 +166,7 @@ class ExpressionBuilder:
 
     def __init__(self, expr: str) -> None:
         self.expression_str = expr
+        self.logger = logging.getLogger(__name__)
 
     @staticmethod
     def _apply_mask(match_object: re.Match) -> str:
@@ -241,24 +252,20 @@ class ExpressionBuilder:
         """
         operator = self._get_lowest_priority_operator(expr)
         terms = self.parse_terms(expr, operator)
-        # print(f"Expr: {expr} Operator: {operator} Terms: {terms}")
+        self.logger.debug(
+            "Expression: %s | Operator: '%s' | Terms: %s", expr, operator, terms
+        )
         left, right = terms[0], terms[1]
         if self.count_operators(left) > 0:
-            # print(f"Left is a larger expr: {left}")
             if left.startswith("(") and left.endswith(")"):
                 left = self._build_expression(left[1:-1], True)
             else:
                 left = self._build_expression(left)
-            # print(
-            #    f"out of left recursion. left = {left} type {type(left)}")
         if self.count_operators(right) > 0:
-            # print(f"Right is a larger expr: {right}")
             if right.startswith("(") and right.endswith(")"):
                 right = self._build_expression(right[1:-1], True)
             else:
                 right = self._build_expression(right)
-            # print(
-            #    f'out of right recursion right = {right} type {type(right)}')
         return Expression(left, right, operator, is_within_brackets)
 
     def build(self) -> Expression:
@@ -271,21 +278,53 @@ class ExpressionBuilder:
         try:
             expr = self._build_expression(self.expression_str)
         except TypeError as err:
-            raise ValueError("Failed to build expression. Expression string might be invalid.") from err
+            raise ValueError(
+                "Failed to build expression. Expression string might be invalid."
+            ) from err
         return expr
+
+
+def create_logger() -> logging.Logger:
+    """
+    Configure top-level logger, which is named after __name__
+    and has two separate handlers:
+        A console handler for warnings and above
+        A file hander for debugging
+    """
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.WARNING)
+    file_handler = logging.FileHandler("pyexpr.log", "w", "utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    console_formatter = logging.Formatter("%(levelname)s: %(message)s")
+    file_formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s: %(message)s"
+    )
+    console_handler.setFormatter(console_formatter)
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+    return logger
 
 
 def main() -> None:
     """
     Demo function.
     """
-    # test = "5+5/5+(5-5)/5"
-    # test2 = "5/5+(5*(5+5))"
-    test3 = "(5-4)/5+(5*(5+5/-2))-3-2+3*5^2-1-2-3"
+    logger = create_logger()
 
-    expr = Expression.parse(test3)
-    print(f"Demo complex expression: {expr} = {expr.calculate()}")
-    print(f"Expected result (using eval()): {eval(str(expr).replace('^', '**'))}")
+    demo = "(5-4)/5+(5*(5+5/-2))-3-2+3*5^2-1-2-3"
+    logger.info("Parsing demo expression: %s", demo)
+    expr = Expression.parse(demo)
+    logger.info("Expression parsed. Evaluating result...")
+    result = expr.calculate()
+    logger.info("Result = %s", result)
+    logger.info("Comparing to result of eval()...")
+    eval_result = eval(demo.replace("^", "**"))
+    logger.info("Eval result = %s", eval_result)
+    print(f"Demo expression: {expr} = {result}")
+    print(f"Expected result (using eval()): {eval_result}")
 
 
 if __name__ == "__main__":
