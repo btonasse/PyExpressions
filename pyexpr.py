@@ -19,6 +19,7 @@ ExpressionBuilder:
 
 from __future__ import annotations
 import re
+import string
 from enum import Enum
 from typing import Any, Tuple, Union
 
@@ -148,7 +149,7 @@ class ExpressionBuilder:
     bracket_regex: re.Pattern = re.compile(r"\([^\(\)]+\)")
     # Regex to find an operator (replace % with the operator to be searched)
     # The negative lookbehind is there to prevent false matches when dealing with negative numbers
-    operator_regex: str = r".(?<!\/|\(|-)(\%)"
+    operator_regex: str = r"(?<!^)(?<!\/|\(|-)\%"
     # Get operators in ascending order of priority
     operators = [member.value for member in reversed(list(Operator))]
 
@@ -195,7 +196,7 @@ class ExpressionBuilder:
         # Compile pattern, replacing % with the actual operator being searched
         pat = cls._compile_operator_regex(operator)
         # Get index of rightmost match
-        i = list(re.finditer(pat, expr))[-1].start() + 1
+        i = list(re.finditer(pat, expr))[-1].start()
         # Split string at that index, omitting the operator itself
         left, right = expr[:i], expr[i + 1 :]
         return left, right
