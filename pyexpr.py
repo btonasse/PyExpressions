@@ -34,8 +34,6 @@ class Operator(Enum):
     Has the following utility class methods:
         has_value(val):
             Checks if val is one of the values of this enum.
-        get_regex_escaped_value(element):
-            Returns an escaped representation of the member's value (to be used in regex patterns).
     """
 
     EXPONENTIATION = "^"
