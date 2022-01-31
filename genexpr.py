@@ -1,6 +1,7 @@
 """
 Try to generate random expressions to solve the following puzzle:
-Given a list of digits 5, 5, 5, 5, 5, use basic arithmetic operators (parenthesis allowed) to form the numbers 1 to 15
+Given a list of digits 5, 5, 5, 5, 5, use basic arithmetic operators
+(parenthesis allowed) to form the numbers 1 to 15
 """
 
 import random
