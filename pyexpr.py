@@ -76,8 +76,8 @@ class Expression:
         self.left = left
         self.right = right
         # Replace standard representation of exponentiation with the python ** operator
-        self.operator = operator.replace("^", "**")
-        self._str_representation = str(left) + self.operator + str(right)
+        self.operator = operator
+        self._str_representation = str(left) + operator + str(right)
         if is_within_brackets:
             self._str_representation = "(" + self._str_representation + ")"
 
@@ -121,7 +121,7 @@ class Expression:
         """
         left = self.resolve_operand(self.left)
         right = self.resolve_operand(self.right)
-        result = eval(left + self.operator + right)
+        result = eval(left + self.operator.replace("^", "**") + right)
         self.logger.debug(
             "Calculating expression: %s",
             left + self.operator + right + " = " + str(result),
