@@ -114,3 +114,6 @@ dmypy.json
 .pyre/
 
 .vscode/
+
+# MacOs
+.DS_STORE
